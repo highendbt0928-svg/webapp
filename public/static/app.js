@@ -21,9 +21,14 @@ const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 const resultSection = document.getElementById('resultSection');
 const resultGif = document.getElementById('resultGif');
+const resultVideo = document.getElementById('resultVideo');
 const downloadBtn = document.getElementById('downloadBtn');
+const convertToVideoBtn = document.getElementById('convertToVideoBtn');
+const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const fileSize = document.getElementById('fileSize');
+const conversionProgress = document.getElementById('conversionProgress');
+const conversionText = document.getElementById('conversionText');
 
 // Settings
 const frameSpeedInput = document.getElementById('frameSpeed');
@@ -51,6 +56,8 @@ dropZone.addEventListener('drop', handleDrop);
 clearFramesBtn.addEventListener('click', clearFrames);
 generateBtn.addEventListener('click', generateGIF);
 downloadBtn.addEventListener('click', downloadGIF);
+convertToVideoBtn.addEventListener('click', convertToVideo);
+downloadVideoBtn.addEventListener('click', downloadVideo);
 resetBtn.addEventListener('click', reset);
 
 // Crossfade toggle
@@ -500,5 +507,124 @@ function reset() {
     frames = [];
     updateFramesList();
     resultSection.classList.add('hidden');
+    resultGif.classList.remove('hidden');
+    resultVideo.classList.add('hidden');
+    downloadVideoBtn.classList.add('hidden');
+    convertToVideoBtn.classList.remove('hidden');
     fileInput.value = '';
+}
+
+// Convert GIF to Video using Canvas and MediaRecorder
+async function convertToVideo() {
+    if (!resultGif.blob) {
+        alert('먼저 GIF를 생성해주세요.');
+        return;
+    }
+    
+    try {
+        conversionProgress.classList.remove('hidden');
+        conversionText.textContent = 'GIF를 분석하는 중...';
+        convertToVideoBtn.disabled = true;
+        
+        // Create a temporary image to load the GIF
+        const img = new Image();
+        const gifUrl = URL.createObjectURL(resultGif.blob);
+        
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = gifUrl;
+        });
+        
+        conversionText.textContent = '동영상으로 변환 중...';
+        
+        // Create canvas with same dimensions as GIF
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        // Get frame delay from settings
+        const delay = parseInt(frameDelayInput.value);
+        const fps = Math.round(1000 / delay);
+        
+        // Create video stream from canvas
+        const stream = canvas.captureStream(fps);
+        const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm;codecs=vp9',
+            videoBitsPerSecond: 2500000
+        });
+        
+        const chunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+        
+        mediaRecorder.onstop = async () => {
+            const webmBlob = new Blob(chunks, { type: 'video/webm' });
+            
+            // Display video
+            const videoUrl = URL.createObjectURL(webmBlob);
+            resultVideo.src = videoUrl;
+            resultVideo.blob = webmBlob;
+            
+            resultGif.classList.add('hidden');
+            resultVideo.classList.remove('hidden');
+            convertToVideoBtn.classList.add('hidden');
+            downloadVideoBtn.classList.remove('hidden');
+            
+            conversionProgress.classList.add('hidden');
+            convertToVideoBtn.disabled = false;
+            
+            const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
+            const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
+            fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+            
+            URL.revokeObjectURL(gifUrl);
+        };
+        
+        // Start recording
+        mediaRecorder.start();
+        
+        // Draw frames from canvas (simulate GIF animation)
+        const totalFrames = frames.length;
+        const frameDelay = delay;
+        
+        for (let i = 0; i < totalFrames * 2; i++) { // Loop twice for better video
+            const frameIndex = i % totalFrames;
+            
+            // Clear and draw frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Use the original frame images
+            if (frames[frameIndex] && frames[frameIndex].image) {
+                ctx.drawImage(frames[frameIndex].image, 0, 0, canvas.width, canvas.height);
+            }
+            
+            // Wait for frame delay
+            await new Promise(resolve => setTimeout(resolve, frameDelay));
+        }
+        
+        // Stop recording
+        mediaRecorder.stop();
+        
+    } catch (error) {
+        console.error('동영상 변환 오류:', error);
+        alert(`동영상 변환 중 오류가 발생했습니다.\n\n${error.message}`);
+        conversionProgress.classList.add('hidden');
+        convertToVideoBtn.disabled = false;
+    }
+}
+
+function downloadVideo() {
+    if (resultVideo.blob) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(resultVideo.blob);
+        a.download = `video-${Date.now()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
 }

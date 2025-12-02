@@ -244,12 +244,23 @@ app.get('/', (c) => {
                 </h2>
                 
                 <div class="text-center">
-                    <img id="resultGif" src="" alt="Generated GIF" class="max-w-full mx-auto rounded-lg shadow-lg mb-4">
+                    <div id="mediaPreview" class="max-w-full mx-auto mb-4">
+                        <img id="resultGif" src="" alt="Generated GIF" class="max-w-full mx-auto rounded-lg shadow-lg">
+                        <video id="resultVideo" class="max-w-full mx-auto rounded-lg shadow-lg hidden" controls loop autoplay muted></video>
+                    </div>
                     
-                    <div class="flex gap-4 justify-center">
+                    <div class="flex flex-wrap gap-3 justify-center mb-4">
                         <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition">
                             <i class="fas fa-download mr-2"></i>
-                            다운로드
+                            GIF 다운로드
+                        </button>
+                        <button id="convertToVideoBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition">
+                            <i class="fas fa-video mr-2"></i>
+                            MP4로 변환
+                        </button>
+                        <button id="downloadVideoBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition hidden">
+                            <i class="fas fa-download mr-2"></i>
+                            MP4 다운로드
                         </button>
                         <button id="resetBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition">
                             <i class="fas fa-redo mr-2"></i>
@@ -257,7 +268,16 @@ app.get('/', (c) => {
                         </button>
                     </div>
                     
-                    <p id="fileSize" class="text-sm text-gray-600 mt-4"></p>
+                    <div id="conversionProgress" class="hidden mb-4">
+                        <div class="bg-blue-100 border-l-4 border-blue-500 p-4 rounded">
+                            <p class="text-sm text-blue-800">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>
+                                <span id="conversionText">동영상 변환 중...</span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <p id="fileSize" class="text-sm text-gray-600"></p>
                 </div>
             </div>
         </main>
