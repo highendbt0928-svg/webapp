@@ -1,3 +1,6 @@
+// Check if gif.js is loaded
+console.log('GIF.js loaded:', typeof GIF !== 'undefined');
+
 // State
 let frames = [];
 let draggedIndex = null;
@@ -214,6 +217,12 @@ async function generateGIF() {
         return;
     }
     
+    // Check if GIF library is loaded
+    if (typeof GIF === 'undefined') {
+        alert('GIF 라이브러리가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
+        return;
+    }
+    
     generateBtn.disabled = true;
     progressSection.classList.remove('hidden');
     resultSection.classList.add('hidden');
@@ -224,6 +233,8 @@ async function generateGIF() {
     const quality = parseInt(gifQualityInput.value);
     
     try {
+        console.log('GIF 생성 시작:', { delay, repeat, width, quality, frameCount: frames.length });
+        
         const gif = new GIF({
             workers: 2,
             quality: quality,
@@ -234,29 +245,42 @@ async function generateGIF() {
         
         // Add frames
         for (let i = 0; i < frames.length; i++) {
-            const frame = frames[i];
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Calculate height to maintain aspect ratio
-            const aspectRatio = frame.image.height / frame.image.width;
-            canvas.width = width;
-            canvas.height = Math.round(width * aspectRatio);
-            
-            ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
-            
-            gif.addFrame(canvas, { delay: delay });
-            
-            const progress = Math.round(((i + 1) / frames.length) * 50);
-            updateProgress(progress, `프레임 추가 중... ${i + 1}/${frames.length}`);
+            try {
+                const frame = frames[i];
+                console.log(`Processing frame ${i + 1}:`, frame.image.width, 'x', frame.image.height);
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Calculate height to maintain aspect ratio
+                const aspectRatio = frame.image.height / frame.image.width;
+                canvas.width = width;
+                canvas.height = Math.round(width * aspectRatio);
+                
+                console.log(`Canvas size: ${canvas.width} x ${canvas.height}`);
+                
+                ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
+                
+                gif.addFrame(canvas, { delay: delay });
+                
+                const progress = Math.round(((i + 1) / frames.length) * 50);
+                updateProgress(progress, `프레임 추가 중... ${i + 1}/${frames.length}`);
+            } catch (frameError) {
+                console.error(`Frame ${i + 1} processing error:`, frameError);
+                throw new Error(`프레임 ${i + 1} 처리 중 오류: ${frameError.message}`);
+            }
         }
         
+        console.log('All frames added, starting render...');
+        
         gif.on('progress', (p) => {
+            console.log('Render progress:', Math.round(p * 100) + '%');
             const progress = 50 + Math.round(p * 50);
             updateProgress(progress, 'GIF 생성 중...');
         });
         
         gif.on('finished', (blob) => {
+            console.log('GIF finished! Size:', blob.size, 'bytes');
             const url = URL.createObjectURL(blob);
             resultGif.src = url;
             resultSection.classList.remove('hidden');
@@ -274,11 +298,17 @@ async function generateGIF() {
             resultSection.scrollIntoView({ behavior: 'smooth' });
         });
         
+        gif.on('error', (err) => {
+            console.error('GIF render error:', err);
+            throw new Error('GIF 렌더링 실패: ' + err.message);
+        });
+        
+        console.log('Starting gif.render()...');
         gif.render();
         
     } catch (error) {
         console.error('GIF 생성 오류:', error);
-        alert('GIF 생성 중 오류가 발생했습니다.');
+        alert(`GIF 생성 중 오류가 발생했습니다.\n\n오류 내용: ${error.message || error}\n\n브라우저 콘솔(F12)에서 자세한 내용을 확인하세요.`);
         generateBtn.disabled = false;
         progressSection.classList.add('hidden');
     }
