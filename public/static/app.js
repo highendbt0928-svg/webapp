@@ -57,6 +57,12 @@ enableCrossfadeInput.addEventListener('change', (e) => {
     }
 });
 
+// Update crossfade value display
+const crossfadeValue = document.getElementById('crossfadeValue');
+crossfadeFramesInput.addEventListener('input', (e) => {
+    crossfadeValue.textContent = e.target.value;
+});
+
 // File handling
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
@@ -276,15 +282,22 @@ async function generateGIF() {
         if (enableCrossfade && frames.length > 1) {
             console.log(`크로스페이드 효과 적용 (전환 프레임: ${crossfadeFrames})`);
             
+            // Easing function for smoother transitions (ease-in-out)
+            const easeInOutCubic = (t) => {
+                return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            };
+            
             for (let i = 0; i < frames.length; i++) {
                 try {
-                    // Add main frame
-                    gif.addFrame(canvases[i], { delay: delay, copy: true });
+                    // Add main frame with longer display time
+                    const mainFrameDelay = Math.floor(delay * 0.7); // 70% of total delay for main frame
+                    gif.addFrame(canvases[i], { delay: mainFrameDelay, copy: true });
                     
                     // Add crossfade frames between this and next frame
                     if (i < frames.length - 1) {
                         const nextCanvas = canvases[i + 1];
-                        const transitionDelay = Math.floor(delay / (crossfadeFrames + 1));
+                        const transitionTotalDelay = delay - mainFrameDelay; // 30% for transition
+                        const transitionDelay = Math.floor(transitionTotalDelay / crossfadeFrames);
                         
                         for (let t = 1; t <= crossfadeFrames; t++) {
                             const transitionCanvas = document.createElement('canvas');
@@ -292,19 +305,30 @@ async function generateGIF() {
                             transitionCanvas.height = canvases[i].height;
                             const transitionCtx = transitionCanvas.getContext('2d');
                             
-                            // Calculate opacity
-                            const opacity = t / (crossfadeFrames + 1);
+                            // Apply easing function for smoother transition
+                            const progress = t / (crossfadeFrames + 1);
+                            const easedProgress = easeInOutCubic(progress);
+                            
+                            // Clear canvas
+                            transitionCtx.clearRect(0, 0, transitionCanvas.width, transitionCanvas.height);
                             
                             // Draw current frame
-                            transitionCtx.globalAlpha = 1 - opacity;
+                            transitionCtx.globalAlpha = 1 - easedProgress;
+                            transitionCtx.globalCompositeOperation = 'source-over';
                             transitionCtx.drawImage(canvases[i], 0, 0);
                             
-                            // Draw next frame
-                            transitionCtx.globalAlpha = opacity;
+                            // Draw next frame with blending
+                            transitionCtx.globalAlpha = easedProgress;
+                            transitionCtx.globalCompositeOperation = 'source-over';
                             transitionCtx.drawImage(nextCanvas, 0, 0);
+                            
+                            transitionCtx.globalAlpha = 1.0;
                             
                             gif.addFrame(transitionCanvas, { delay: transitionDelay, copy: true });
                         }
+                    } else {
+                        // Last frame - no transition needed, use full delay
+                        // Already added with mainFrameDelay above
                     }
                     
                     const progress = Math.round(((i + 1) / frames.length) * 50);

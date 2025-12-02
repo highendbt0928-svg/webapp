@@ -157,25 +157,38 @@ app.get('/', (c) => {
 
                     <!-- Crossfade Effect -->
                     <div class="md:col-span-2">
-                        <div class="flex items-center justify-between bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
-                            <div class="flex-1">
-                                <label class="flex items-center cursor-pointer">
-                                    <input type="checkbox" id="enableCrossfade" class="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500 mr-3">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-800">
-                                            <i class="fas fa-wand-magic-sparkles mr-2 text-purple-600"></i>
-                                            크로스페이드 효과
-                                        </span>
-                                        <p class="text-xs text-gray-600 mt-1">프레임 간 부드러운 전환 효과 (처리 시간이 증가할 수 있습니다)</p>
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border-2 border-purple-200">
+                            <label class="flex items-start cursor-pointer mb-3">
+                                <input type="checkbox" id="enableCrossfade" class="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500 mr-3 mt-0.5">
+                                <div class="flex-1">
+                                    <span class="text-sm font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-film mr-2 text-purple-600"></i>
+                                        부드러운 전환 효과 (크로스페이드)
+                                    </span>
+                                    <p class="text-xs text-gray-600 mt-1">
+                                        프레임이 서서히 페이드되어 자연스럽게 전환됩니다
+                                        <br>
+                                        <span class="text-purple-700 font-medium">💡 사진 슬라이드쇼나 부드러운 애니메이션에 적합</span>
+                                    </p>
+                                </div>
+                            </label>
+                            
+                            <div id="crossfadeSettings" class="hidden pl-8 border-l-2 border-purple-300 ml-2">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <label class="block text-xs font-medium text-gray-700 mb-2">
+                                            전환 부드러움 정도
+                                        </label>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs text-gray-500">빠름</span>
+                                            <input type="range" id="crossfadeFrames" value="5" min="2" max="10" step="1"
+                                                class="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer">
+                                            <span class="text-xs text-gray-500">부드러움</span>
+                                            <span id="crossfadeValue" class="text-sm font-bold text-purple-600 min-w-[2rem]">5</span>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-1">값이 높을수록 전환이 더 부드럽지만 파일 크기가 커집니다</p>
                                     </div>
-                                </label>
-                            </div>
-                            <div id="crossfadeSettings" class="ml-6 hidden">
-                                <label class="block text-xs font-medium text-gray-700 mb-1">
-                                    전환 프레임 수
-                                </label>
-                                <input type="number" id="crossfadeFrames" value="3" min="2" max="10" step="1"
-                                    class="w-20 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                </div>
                             </div>
                         </div>
                     </div>
