@@ -103,14 +103,26 @@ function updateFramesList() {
     }
     
     framesList.innerHTML = frames.map((frame, index) => `
-        <div class="frame-item bg-gray-100 rounded-lg p-2 cursor-move" 
+        <div class="frame-item bg-white border-2 border-gray-300 rounded-lg p-2 cursor-move hover:border-purple-400 transition-all" 
              draggable="true" 
-             data-index="${index}">
+             data-index="${index}"
+             title="드래그하여 순서 변경">
+            <div class="relative">
+                <div class="absolute top-1 left-1 bg-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                    ${index + 1}
+                </div>
+                <div class="absolute top-1 right-1 bg-gray-800 bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+            </div>
             <img src="${frame.src}" alt="Frame ${index + 1}" class="w-full h-32 object-cover rounded mb-2">
-            <div class="flex justify-between items-center">
-                <span class="text-xs text-gray-600">#${index + 1}</span>
-                <button class="text-red-600 hover:text-red-800" onclick="removeFrame(${index})">
-                    <i class="fas fa-times"></i>
+            <div class="flex justify-between items-center mt-2">
+                <span class="text-xs text-gray-500">
+                    <i class="fas fa-arrows-alt mr-1"></i>
+                    드래그로 이동
+                </span>
+                <button class="text-red-600 hover:text-red-800 transition" onclick="removeFrame(${index})">
+                    <i class="fas fa-trash-alt"></i>
                 </button>
             </div>
         </div>
@@ -121,6 +133,7 @@ function updateFramesList() {
     frameItems.forEach(item => {
         item.addEventListener('dragstart', handleFrameDragStart);
         item.addEventListener('dragover', handleFrameDragOver);
+        item.addEventListener('dragleave', handleFrameDragLeave);
         item.addEventListener('drop', handleFrameDrop);
         item.addEventListener('dragend', handleFrameDragEnd);
     });
@@ -140,17 +153,37 @@ function clearFrames() {
 
 // Frame drag and drop
 function handleFrameDragStart(e) {
-    draggedIndex = parseInt(e.target.dataset.index);
-    e.target.classList.add('dragging');
+    draggedIndex = parseInt(e.currentTarget.dataset.index);
+    e.currentTarget.classList.add('dragging');
+    e.currentTarget.style.opacity = '0.5';
 }
 
 function handleFrameDragOver(e) {
     e.preventDefault();
+    const targetItem = e.currentTarget;
+    if (targetItem.classList.contains('frame-item') && !targetItem.classList.contains('dragging')) {
+        targetItem.classList.add('drag-over');
+        targetItem.style.borderColor = '#9333ea';
+        targetItem.style.transform = 'scale(1.05)';
+    }
+}
+
+function handleFrameDragLeave(e) {
+    const targetItem = e.currentTarget;
+    targetItem.classList.remove('drag-over');
+    targetItem.style.borderColor = '';
+    targetItem.style.transform = '';
 }
 
 function handleFrameDrop(e) {
     e.preventDefault();
-    const targetIndex = parseInt(e.currentTarget.dataset.index);
+    const targetItem = e.currentTarget;
+    const targetIndex = parseInt(targetItem.dataset.index);
+    
+    // Remove visual feedback
+    targetItem.classList.remove('drag-over');
+    targetItem.style.borderColor = '';
+    targetItem.style.transform = '';
     
     if (draggedIndex !== null && draggedIndex !== targetIndex) {
         const draggedFrame = frames[draggedIndex];
@@ -161,7 +194,16 @@ function handleFrameDrop(e) {
 }
 
 function handleFrameDragEnd(e) {
-    e.target.classList.remove('dragging');
+    e.currentTarget.classList.remove('dragging');
+    e.currentTarget.style.opacity = '';
+    
+    // Remove any remaining drag-over classes
+    document.querySelectorAll('.frame-item').forEach(item => {
+        item.classList.remove('drag-over');
+        item.style.borderColor = '';
+        item.style.transform = '';
+    });
+    
     draggedIndex = null;
 }
 

@@ -29,13 +29,20 @@ app.get('/', (c) => {
             }
             .frame-item {
                 transition: all 0.2s ease;
+                position: relative;
             }
             .frame-item:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 6px 12px rgba(147, 51, 234, 0.3);
             }
             .frame-item.dragging {
                 opacity: 0.5;
+                transform: scale(0.95);
+            }
+            .frame-item.drag-over {
+                border-color: #9333ea !important;
+                transform: scale(1.05);
+                box-shadow: 0 8px 16px rgba(147, 51, 234, 0.4);
             }
         </style>
     </head>
@@ -80,6 +87,13 @@ app.get('/', (c) => {
                     프레임 관리
                     <span id="frameCount" class="text-sm text-gray-500 ml-2">(0개)</span>
                 </h2>
+                
+                <div class="bg-purple-50 border-l-4 border-purple-500 p-4 mb-4 rounded">
+                    <p class="text-sm text-purple-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>드래그 앤 드롭으로 순서 변경:</strong> 프레임을 클릭한 채로 드래그하여 원하는 위치로 이동시키세요!
+                    </p>
+                </div>
                 
                 <div id="framesList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
                     <!-- Frames will be inserted here -->
