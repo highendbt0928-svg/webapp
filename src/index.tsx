@@ -176,9 +176,14 @@ app.get('/', (c) => {
                                     class="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
                                 <span class="text-xs text-gray-500 w-12 text-right">느림</span>
                             </div>
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="text-gray-600">현재: <span id="speedDisplay" class="font-bold text-blue-600">보통 (0.5초)</span></span>
-                                <span class="text-gray-500">각 프레임이 표시되는 시간</span>
+                            <div class="flex items-center justify-between text-xs gap-2">
+                                <span class="text-gray-600 flex-1">현재: <span id="speedDisplay" class="font-bold text-blue-600">보통 (0.5초)</span></span>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-gray-600">직접 입력:</label>
+                                    <input type="number" id="speedDirectInput" value="0.5" min="0.1" max="3.0" step="0.1"
+                                        class="w-20 border border-gray-300 rounded px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <span class="text-gray-500">초</span>
+                                </div>
                             </div>
                         </div>
                         <input type="hidden" id="frameDelay" value="500">

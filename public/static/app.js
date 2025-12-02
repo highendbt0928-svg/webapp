@@ -39,6 +39,7 @@ const conversionText = document.getElementById('conversionText');
 // Settings
 const frameSpeedInput = document.getElementById('frameSpeed');
 const speedDisplay = document.getElementById('speedDisplay');
+const speedDirectInput = document.getElementById('speedDirectInput');
 const frameDelayInput = document.getElementById('frameDelay');
 const loopCountInput = document.getElementById('loopCount');
 const gifSizePreset = document.getElementById('gifSizePreset');
@@ -87,25 +88,43 @@ crossfadeFramesInput.addEventListener('input', (e) => {
 });
 
 // Frame speed converter
-function updateFrameSpeed() {
-    const speed = parseInt(frameSpeedInput.value);
-    // Convert 1-20 scale to milliseconds
-    // 1 = 100ms (very fast), 5 = 500ms (normal), 10 = 1000ms (1 sec), 20 = 3000ms (3 sec)
+function updateFrameSpeed(fromDirect = false) {
     let delayMs;
     let displayText;
     
-    if (speed <= 10) {
-        // 1-10: 100ms to 1000ms (linear)
-        delayMs = speed * 100;
+    if (fromDirect) {
+        // Update from direct input (seconds)
+        const seconds = parseFloat(speedDirectInput.value);
+        delayMs = Math.round(seconds * 1000);
+        
+        // Update slider position
+        if (delayMs <= 1000) {
+            frameSpeedInput.value = Math.round(delayMs / 100);
+        } else {
+            frameSpeedInput.value = 10 + Math.round((delayMs - 1000) / 200);
+        }
     } else {
-        // 11-20: 1200ms to 3000ms
-        delayMs = 1000 + ((speed - 10) * 200);
+        // Update from slider
+        const speed = parseInt(frameSpeedInput.value);
+        
+        if (speed <= 10) {
+            // 1-10: 100ms to 1000ms (linear)
+            delayMs = speed * 100;
+        } else {
+            // 11-20: 1200ms to 3000ms
+            delayMs = 1000 + ((speed - 10) * 200);
+        }
+        
+        // Update direct input
+        speedDirectInput.value = (delayMs / 1000).toFixed(1);
     }
     
     frameDelayInput.value = delayMs;
     
     // Display text
     const seconds = (delayMs / 1000).toFixed(1);
+    const speed = parseInt(frameSpeedInput.value);
+    
     if (speed <= 3) {
         displayText = `매우 빠름 (${seconds}초)`;
     } else if (speed <= 6) {
@@ -125,7 +144,10 @@ function updateFrameSpeed() {
 updateFrameSpeed();
 
 // Update on slider change
-frameSpeedInput.addEventListener('input', updateFrameSpeed);
+frameSpeedInput.addEventListener('input', () => updateFrameSpeed(false));
+
+// Update on direct input change
+speedDirectInput.addEventListener('input', () => updateFrameSpeed(true));
 
 // GIF size preset handler
 gifSizePreset.addEventListener('change', (e) => {
