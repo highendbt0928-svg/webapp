@@ -26,9 +26,14 @@ const resetBtn = document.getElementById('resetBtn');
 const fileSize = document.getElementById('fileSize');
 
 // Settings
+const frameSpeedInput = document.getElementById('frameSpeed');
+const speedDisplay = document.getElementById('speedDisplay');
 const frameDelayInput = document.getElementById('frameDelay');
 const loopCountInput = document.getElementById('loopCount');
+const gifSizePreset = document.getElementById('gifSizePreset');
 const gifWidthInput = document.getElementById('gifWidth');
+const qualitySlider = document.getElementById('qualitySlider');
+const qualityDisplay = document.getElementById('qualityDisplay');
 const gifQualityInput = document.getElementById('gifQuality');
 const enableCrossfadeInput = document.getElementById('enableCrossfade');
 const crossfadeFramesInput = document.getElementById('crossfadeFrames');
@@ -62,6 +67,85 @@ const crossfadeValue = document.getElementById('crossfadeValue');
 crossfadeFramesInput.addEventListener('input', (e) => {
     crossfadeValue.textContent = e.target.value;
 });
+
+// Frame speed converter
+function updateFrameSpeed() {
+    const speed = parseInt(frameSpeedInput.value);
+    // Convert 1-20 scale to milliseconds
+    // 1 = 100ms (very fast), 5 = 500ms (normal), 10 = 1000ms (1 sec), 20 = 3000ms (3 sec)
+    let delayMs;
+    let displayText;
+    
+    if (speed <= 10) {
+        // 1-10: 100ms to 1000ms (linear)
+        delayMs = speed * 100;
+    } else {
+        // 11-20: 1200ms to 3000ms
+        delayMs = 1000 + ((speed - 10) * 200);
+    }
+    
+    frameDelayInput.value = delayMs;
+    
+    // Display text
+    const seconds = (delayMs / 1000).toFixed(1);
+    if (speed <= 3) {
+        displayText = `매우 빠름 (${seconds}초)`;
+    } else if (speed <= 6) {
+        displayText = `빠름 (${seconds}초)`;
+    } else if (speed <= 10) {
+        displayText = `보통 (${seconds}초)`;
+    } else if (speed <= 15) {
+        displayText = `느림 (${seconds}초)`;
+    } else {
+        displayText = `매우 느림 (${seconds}초)`;
+    }
+    
+    speedDisplay.textContent = displayText;
+}
+
+// Initialize speed display
+updateFrameSpeed();
+
+// Update on slider change
+frameSpeedInput.addEventListener('input', updateFrameSpeed);
+
+// GIF size preset handler
+gifSizePreset.addEventListener('change', (e) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+        gifWidthInput.classList.remove('hidden');
+    } else {
+        gifWidthInput.classList.add('hidden');
+        gifWidthInput.value = value;
+    }
+});
+
+// Quality slider handler
+function updateQuality() {
+    const quality = parseInt(qualitySlider.value);
+    gifQualityInput.value = quality;
+    
+    let displayText;
+    if (quality <= 5) {
+        displayText = '최고 품질 (느림)';
+    } else if (quality <= 10) {
+        displayText = '고품질 (권장)';
+    } else if (quality <= 15) {
+        displayText = '보통 품질';
+    } else if (quality <= 20) {
+        displayText = '빠른 생성';
+    } else {
+        displayText = '매우 빠름 (낮은 품질)';
+    }
+    
+    qualityDisplay.textContent = displayText;
+}
+
+// Initialize quality display
+updateQuality();
+
+// Update on slider change
+qualitySlider.addEventListener('input', updateQuality);
 
 // File handling
 function handleFileSelect(e) {

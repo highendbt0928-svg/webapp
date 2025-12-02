@@ -115,14 +115,24 @@ app.get('/', (c) => {
                 </h2>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Frame Delay -->
+                    <!-- Frame Speed -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            프레임 지연 시간 (밀리초)
+                            애니메이션 속도
                         </label>
-                        <input type="number" id="frameDelay" value="500" min="10" max="5000" step="10"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <p class="text-xs text-gray-500 mt-1">각 프레임이 표시되는 시간 (낮을수록 빠름)</p>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 w-12">빠름</span>
+                                <input type="range" id="frameSpeed" value="5" min="1" max="20" step="1"
+                                    class="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+                                <span class="text-xs text-gray-500 w-12 text-right">느림</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-600">현재: <span id="speedDisplay" class="font-bold text-blue-600">보통 (0.5초)</span></span>
+                                <span class="text-gray-500">각 프레임이 표시되는 시간</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="frameDelay" value="500">
                     </div>
 
                     <!-- Loop Count -->
@@ -135,24 +145,40 @@ app.get('/', (c) => {
                         <p class="text-xs text-gray-500 mt-1">0 = 무한 반복</p>
                     </div>
 
-                    <!-- GIF Width -->
+                    <!-- GIF Size -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            GIF 너비 (픽셀)
+                            GIF 크기
                         </label>
+                        <select id="gifSizePreset" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                            <option value="320">작음 (320px - SNS 최적화)</option>
+                            <option value="480" selected>보통 (480px - 권장)</option>
+                            <option value="640">큼 (640px - 고품질)</option>
+                            <option value="800">매우 큼 (800px)</option>
+                            <option value="custom">사용자 정의</option>
+                        </select>
                         <input type="number" id="gifWidth" value="480" min="100" max="1920" step="10"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="hidden w-full border border-gray-300 rounded-lg px-4 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <p class="text-xs text-gray-500 mt-1">높이는 비율에 맞춰 자동 조정됩니다</p>
                     </div>
 
                     <!-- Quality -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            품질 (1-30)
+                            화질
                         </label>
-                        <input type="number" id="gifQuality" value="10" min="1" max="30"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <p class="text-xs text-gray-500 mt-1">낮을수록 고품질 (처리 시간 증가)</p>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 w-16">빠르게</span>
+                                <input type="range" id="qualitySlider" value="10" min="1" max="30" step="1"
+                                    class="flex-1 h-2 bg-green-200 rounded-lg appearance-none cursor-pointer">
+                                <span class="text-xs text-gray-500 w-16 text-right">고품질</span>
+                            </div>
+                            <div class="text-xs text-gray-600">
+                                현재: <span id="qualityDisplay" class="font-bold text-green-600">보통 품질</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="gifQuality" value="10">
                     </div>
 
                     <!-- Crossfade Effect -->
