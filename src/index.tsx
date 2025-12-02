@@ -154,6 +154,31 @@ app.get('/', (c) => {
                             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <p class="text-xs text-gray-500 mt-1">낮을수록 고품질 (처리 시간 증가)</p>
                     </div>
+
+                    <!-- Crossfade Effect -->
+                    <div class="md:col-span-2">
+                        <div class="flex items-center justify-between bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
+                            <div class="flex-1">
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="enableCrossfade" class="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500 mr-3">
+                                    <div>
+                                        <span class="text-sm font-semibold text-gray-800">
+                                            <i class="fas fa-wand-magic-sparkles mr-2 text-purple-600"></i>
+                                            크로스페이드 효과
+                                        </span>
+                                        <p class="text-xs text-gray-600 mt-1">프레임 간 부드러운 전환 효과 (처리 시간이 증가할 수 있습니다)</p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div id="crossfadeSettings" class="ml-6 hidden">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
+                                    전환 프레임 수
+                                </label>
+                                <input type="number" id="crossfadeFrames" value="3" min="2" max="10" step="1"
+                                    class="w-20 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

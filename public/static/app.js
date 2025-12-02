@@ -30,6 +30,9 @@ const frameDelayInput = document.getElementById('frameDelay');
 const loopCountInput = document.getElementById('loopCount');
 const gifWidthInput = document.getElementById('gifWidth');
 const gifQualityInput = document.getElementById('gifQuality');
+const enableCrossfadeInput = document.getElementById('enableCrossfade');
+const crossfadeFramesInput = document.getElementById('crossfadeFrames');
+const crossfadeSettings = document.getElementById('crossfadeSettings');
 
 // Event Listeners
 selectFilesBtn.addEventListener('click', () => fileInput.click());
@@ -44,6 +47,15 @@ clearFramesBtn.addEventListener('click', clearFrames);
 generateBtn.addEventListener('click', generateGIF);
 downloadBtn.addEventListener('click', downloadGIF);
 resetBtn.addEventListener('click', reset);
+
+// Crossfade toggle
+enableCrossfadeInput.addEventListener('change', (e) => {
+    if (e.target.checked) {
+        crossfadeSettings.classList.remove('hidden');
+    } else {
+        crossfadeSettings.classList.add('hidden');
+    }
+});
 
 // File handling
 function handleFileSelect(e) {
@@ -231,6 +243,8 @@ async function generateGIF() {
     const repeat = parseInt(loopCountInput.value);
     const width = parseInt(gifWidthInput.value);
     const quality = parseInt(gifQualityInput.value);
+    const enableCrossfade = enableCrossfadeInput.checked;
+    const crossfadeFrames = parseInt(crossfadeFramesInput.value);
     
     try {
         console.log('GIF 생성 시작:', { delay, repeat, width, quality, frameCount: frames.length });
@@ -243,31 +257,75 @@ async function generateGIF() {
             repeat: repeat
         });
         
-        // Add frames
+        // Prepare canvases for all frames
+        const canvases = [];
         for (let i = 0; i < frames.length; i++) {
-            try {
-                const frame = frames[i];
-                console.log(`Processing frame ${i + 1}:`, frame.image.width, 'x', frame.image.height);
-                
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Calculate height to maintain aspect ratio
-                const aspectRatio = frame.image.height / frame.image.width;
-                canvas.width = width;
-                canvas.height = Math.round(width * aspectRatio);
-                
-                console.log(`Canvas size: ${canvas.width} x ${canvas.height}`);
-                
-                ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
-                
-                gif.addFrame(canvas, { delay: delay });
-                
-                const progress = Math.round(((i + 1) / frames.length) * 50);
-                updateProgress(progress, `프레임 추가 중... ${i + 1}/${frames.length}`);
-            } catch (frameError) {
-                console.error(`Frame ${i + 1} processing error:`, frameError);
-                throw new Error(`프레임 ${i + 1} 처리 중 오류: ${frameError.message}`);
+            const frame = frames[i];
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const aspectRatio = frame.image.height / frame.image.width;
+            canvas.width = width;
+            canvas.height = Math.round(width * aspectRatio);
+            
+            ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
+            canvases.push(canvas);
+        }
+        
+        // Add frames with optional crossfade
+        if (enableCrossfade && frames.length > 1) {
+            console.log(`크로스페이드 효과 적용 (전환 프레임: ${crossfadeFrames})`);
+            
+            for (let i = 0; i < frames.length; i++) {
+                try {
+                    // Add main frame
+                    gif.addFrame(canvases[i], { delay: delay, copy: true });
+                    
+                    // Add crossfade frames between this and next frame
+                    if (i < frames.length - 1) {
+                        const nextCanvas = canvases[i + 1];
+                        const transitionDelay = Math.floor(delay / (crossfadeFrames + 1));
+                        
+                        for (let t = 1; t <= crossfadeFrames; t++) {
+                            const transitionCanvas = document.createElement('canvas');
+                            transitionCanvas.width = canvases[i].width;
+                            transitionCanvas.height = canvases[i].height;
+                            const transitionCtx = transitionCanvas.getContext('2d');
+                            
+                            // Calculate opacity
+                            const opacity = t / (crossfadeFrames + 1);
+                            
+                            // Draw current frame
+                            transitionCtx.globalAlpha = 1 - opacity;
+                            transitionCtx.drawImage(canvases[i], 0, 0);
+                            
+                            // Draw next frame
+                            transitionCtx.globalAlpha = opacity;
+                            transitionCtx.drawImage(nextCanvas, 0, 0);
+                            
+                            gif.addFrame(transitionCanvas, { delay: transitionDelay, copy: true });
+                        }
+                    }
+                    
+                    const progress = Math.round(((i + 1) / frames.length) * 50);
+                    updateProgress(progress, `프레임 처리 중... ${i + 1}/${frames.length}`);
+                } catch (frameError) {
+                    console.error(`Frame ${i + 1} processing error:`, frameError);
+                    throw new Error(`프레임 ${i + 1} 처리 중 오류: ${frameError.message}`);
+                }
+            }
+        } else {
+            // Normal mode without crossfade
+            for (let i = 0; i < frames.length; i++) {
+                try {
+                    gif.addFrame(canvases[i], { delay: delay, copy: true });
+                    
+                    const progress = Math.round(((i + 1) / frames.length) * 50);
+                    updateProgress(progress, `프레임 추가 중... ${i + 1}/${frames.length}`);
+                } catch (frameError) {
+                    console.error(`Frame ${i + 1} processing error:`, frameError);
+                    throw new Error(`프레임 ${i + 1} 처리 중 오류: ${frameError.message}`);
+                }
             }
         }
         
