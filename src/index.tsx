@@ -44,6 +44,15 @@ app.get('/', (c) => {
                 transform: scale(1.05);
                 box-shadow: 0 8px 16px rgba(147, 51, 234, 0.4);
             }
+            .mode-card {
+                border-width: 3px;
+            }
+            .mode-radio:checked + .mode-card {
+                border-color: #9333ea;
+                background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+                box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+                transform: scale(1.05);
+            }
         </style>
     </head>
     <body class="bg-gray-50 min-h-screen">
@@ -60,17 +69,57 @@ app.get('/', (c) => {
 
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto px-4 py-8">
+            <!-- Mode Selection -->
+            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4 text-center">
+                    <i class="fas fa-magic mr-2 text-purple-600"></i>
+                    변환 모드 선택
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Image to GIF -->
+                    <label class="cursor-pointer">
+                        <input type="radio" name="conversionMode" value="image-to-gif" class="hidden mode-radio" checked>
+                        <div class="mode-card border-3 border-purple-300 rounded-lg p-6 text-center transition hover:shadow-lg bg-white">
+                            <div class="text-5xl mb-3">🖼️</div>
+                            <h3 class="font-bold text-lg mb-2 text-gray-800">이미지 → GIF</h3>
+                            <p class="text-sm text-gray-600">여러 이미지를<br>GIF 애니메이션으로</p>
+                        </div>
+                    </label>
+                    
+                    <!-- Image to Video -->
+                    <label class="cursor-pointer">
+                        <input type="radio" name="conversionMode" value="image-to-video" class="hidden mode-radio">
+                        <div class="mode-card border-3 border-gray-300 rounded-lg p-6 text-center transition hover:shadow-lg bg-white">
+                            <div class="text-5xl mb-3">🎬</div>
+                            <h3 class="font-bold text-lg mb-2 text-gray-800">이미지 → 동영상</h3>
+                            <p class="text-sm text-gray-600">여러 이미지를<br>MP4 동영상으로</p>
+                        </div>
+                    </label>
+                    
+                    <!-- GIF to Video -->
+                    <label class="cursor-pointer">
+                        <input type="radio" name="conversionMode" value="gif-to-video" class="hidden mode-radio">
+                        <div class="mode-card border-3 border-gray-300 rounded-lg p-6 text-center transition hover:shadow-lg bg-white">
+                            <div class="text-5xl mb-3">🎥</div>
+                            <h3 class="font-bold text-lg mb-2 text-gray-800">GIF → 동영상</h3>
+                            <p class="text-sm text-gray-600">GIF 파일을<br>MP4 동영상으로</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <!-- Upload Section -->
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h2 class="text-xl font-semibold mb-4">
                     <i class="fas fa-upload mr-2 text-blue-600"></i>
-                    이미지 업로드
+                    <span id="uploadTitle">이미지 업로드</span>
                 </h2>
                 
                 <div id="dropZone" class="drop-zone rounded-lg p-12 text-center cursor-pointer mb-4">
                     <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
-                    <p class="text-lg text-gray-700 mb-2">이미지를 드래그 앤 드롭하거나 클릭하여 선택</p>
-                    <p class="text-sm text-gray-500">JPG, PNG, GIF 파일 지원</p>
+                    <p class="text-lg text-gray-700 mb-2" id="dropZoneText">이미지를 드래그 앤 드롭하거나 클릭하여 선택</p>
+                    <p class="text-sm text-gray-500" id="dropZoneSubtext">JPG, PNG, GIF 파일 지원</p>
                     <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
                 </div>
 
@@ -225,7 +274,7 @@ app.get('/', (c) => {
             <div id="generateSection" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
                 <button id="generateBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-6 rounded-lg transition text-lg">
                     <i class="fas fa-magic mr-2"></i>
-                    GIF 생성하기
+                    <span id="generateBtnText">GIF 생성하기</span>
                 </button>
                 
                 <div id="progressSection" class="hidden mt-4">

@@ -4,8 +4,14 @@ console.log('GIF.js loaded:', typeof GIF !== 'undefined');
 // State
 let frames = [];
 let draggedIndex = null;
+let conversionMode = 'image-to-gif'; // Default mode
 
 // DOM Elements
+const modeRadios = document.querySelectorAll('.mode-radio');
+const uploadTitle = document.getElementById('uploadTitle');
+const dropZoneText = document.getElementById('dropZoneText');
+const dropZoneSubtext = document.getElementById('dropZoneSubtext');
+const generateBtnText = document.getElementById('generateBtnText');
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const selectFilesBtn = document.getElementById('selectFilesBtn');
@@ -45,6 +51,11 @@ const crossfadeFramesInput = document.getElementById('crossfadeFrames');
 const crossfadeSettings = document.getElementById('crossfadeSettings');
 
 // Event Listeners
+// Mode selection
+modeRadios.forEach(radio => {
+    radio.addEventListener('change', handleModeChange);
+});
+
 selectFilesBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', handleFileSelect);
 
@@ -54,7 +65,7 @@ dropZone.addEventListener('dragleave', handleDragLeave);
 dropZone.addEventListener('drop', handleDrop);
 
 clearFramesBtn.addEventListener('click', clearFrames);
-generateBtn.addEventListener('click', generateGIF);
+generateBtn.addEventListener('click', handleGenerate);
 downloadBtn.addEventListener('click', downloadGIF);
 convertToVideoBtn.addEventListener('click', convertToVideo);
 downloadVideoBtn.addEventListener('click', downloadVideo);
@@ -154,10 +165,49 @@ updateQuality();
 // Update on slider change
 qualitySlider.addEventListener('input', updateQuality);
 
+// Mode handling
+function handleModeChange(e) {
+    conversionMode = e.target.value;
+    
+    // Update UI based on mode
+    if (conversionMode === 'image-to-gif') {
+        uploadTitle.textContent = '이미지 업로드';
+        dropZoneText.textContent = '여러 이미지를 드래그 앤 드롭하거나 클릭하여 선택';
+        dropZoneSubtext.textContent = 'JPG, PNG 파일 지원';
+        generateBtnText.textContent = 'GIF 생성하기';
+        fileInput.setAttribute('accept', 'image/*');
+        fileInput.setAttribute('multiple', 'multiple');
+    } else if (conversionMode === 'image-to-video') {
+        uploadTitle.textContent = '이미지 업로드';
+        dropZoneText.textContent = '여러 이미지를 드래그 앤 드롭하거나 클릭하여 선택';
+        dropZoneSubtext.textContent = 'JPG, PNG 파일 지원';
+        generateBtnText.textContent = '동영상 생성하기';
+        fileInput.setAttribute('accept', 'image/*');
+        fileInput.setAttribute('multiple', 'multiple');
+    } else if (conversionMode === 'gif-to-video') {
+        uploadTitle.textContent = 'GIF 파일 업로드';
+        dropZoneText.textContent = 'GIF 파일을 드래그 앤 드롭하거나 클릭하여 선택';
+        dropZoneSubtext.textContent = 'GIF 파일만 지원 (자동으로 동영상 변환)';
+        generateBtnText.textContent = 'GIF → 동영상 변환';
+        fileInput.setAttribute('accept', 'image/gif');
+        fileInput.removeAttribute('multiple');
+    }
+    
+    // Reset state
+    frames = [];
+    updateFramesList();
+    resultSection.classList.add('hidden');
+}
+
 // File handling
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
-    addFiles(files);
+    
+    if (conversionMode === 'gif-to-video') {
+        handleGifToVideo(files[0]);
+    } else {
+        addFiles(files);
+    }
 }
 
 function handleDragOver(e) {
@@ -317,6 +367,15 @@ function handleFrameDragEnd(e) {
     });
     
     draggedIndex = null;
+}
+
+// Handle generate based on mode
+async function handleGenerate() {
+    if (conversionMode === 'image-to-video') {
+        await generateVideoDirectly();
+    } else {
+        await generateGIF();
+    }
 }
 
 // GIF generation
@@ -626,5 +685,216 @@ function downloadVideo() {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+    }
+}
+
+// Direct GIF to Video conversion
+async function handleGifToVideo(file) {
+    if (!file || file.type !== 'image/gif') {
+        alert('GIF 파일만 업로드 가능합니다.');
+        return;
+    }
+    
+    try {
+        // Hide frames section, show result preparation
+        framesSection.classList.add('hidden');
+        settingsSection.classList.add('hidden');
+        generateSection.classList.add('hidden');
+        
+        progressSection.classList.remove('hidden');
+        updateProgress(10, 'GIF 파일 로드 중...');
+        
+        // Read GIF file
+        const reader = new FileReader();
+        const gifData = await new Promise((resolve, reject) => {
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        
+        updateProgress(30, 'GIF 분석 중...');
+        
+        // Create image to load GIF
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = gifData;
+        });
+        
+        updateProgress(50, '동영상으로 변환 중...');
+        
+        // Create canvas for rendering
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        // Start recording
+        const stream = canvas.captureStream(10); // 10 FPS
+        const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm;codecs=vp9',
+            videoBitsPerSecond: 2500000
+        });
+        
+        const chunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+        
+        mediaRecorder.onstop = () => {
+            const webmBlob = new Blob(chunks, { type: 'video/webm' });
+            const videoUrl = URL.createObjectURL(webmBlob);
+            
+            resultVideo.src = videoUrl;
+            resultVideo.blob = webmBlob;
+            
+            // Show result
+            resultGif.classList.add('hidden');
+            resultVideo.classList.remove('hidden');
+            resultSection.classList.remove('hidden');
+            progressSection.classList.add('hidden');
+            
+            convertToVideoBtn.classList.add('hidden');
+            downloadVideoBtn.classList.remove('hidden');
+            downloadBtn.classList.add('hidden');
+            
+            const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
+            const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
+            fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+        };
+        
+        mediaRecorder.start();
+        
+        updateProgress(70, '녹화 중...');
+        
+        // Draw GIF frames (animate for 3 seconds)
+        const duration = 3000;
+        const frameTime = 100;
+        const totalFrames = duration / frameTime;
+        
+        for (let i = 0; i < totalFrames; i++) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            await new Promise(resolve => setTimeout(resolve, frameTime));
+        }
+        
+        updateProgress(90, '마무리 중...');
+        mediaRecorder.stop();
+        
+    } catch (error) {
+        console.error('GIF to Video 변환 오류:', error);
+        alert(`변환 중 오류가 발생했습니다.\n\n${error.message}`);
+        progressSection.classList.add('hidden');
+    }
+}
+
+// Generate video directly from images
+async function generateVideoDirectly() {
+    if (frames.length === 0) {
+        alert('최소 1개의 이미지를 업로드해주세요.');
+        return;
+    }
+    
+    try {
+        generateBtn.disabled = true;
+        progressSection.classList.remove('hidden');
+        resultSection.classList.add('hidden');
+        
+        const delay = parseInt(frameDelayInput.value);
+        const width = parseInt(gifWidthInput.value);
+        
+        updateProgress(10, '이미지 준비 중...');
+        
+        // Prepare canvases
+        const canvases = [];
+        for (let i = 0; i < frames.length; i++) {
+            const frame = frames[i];
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const aspectRatio = frame.image.height / frame.image.width;
+            canvas.width = width;
+            canvas.height = Math.round(width * aspectRatio);
+            
+            ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
+            canvases.push(canvas);
+        }
+        
+        updateProgress(30, '동영상 생성 중...');
+        
+        // Create recording canvas
+        const recordCanvas = document.createElement('canvas');
+        recordCanvas.width = canvases[0].width;
+        recordCanvas.height = canvases[0].height;
+        const recordCtx = recordCanvas.getContext('2d');
+        
+        const fps = Math.round(1000 / delay);
+        const stream = recordCanvas.captureStream(fps);
+        const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm;codecs=vp9',
+            videoBitsPerSecond: 2500000
+        });
+        
+        const chunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+        
+        mediaRecorder.onstop = () => {
+            const webmBlob = new Blob(chunks, { type: 'video/webm' });
+            const videoUrl = URL.createObjectURL(webmBlob);
+            
+            resultVideo.src = videoUrl;
+            resultVideo.blob = webmBlob;
+            
+            resultGif.classList.add('hidden');
+            resultVideo.classList.remove('hidden');
+            resultSection.classList.remove('hidden');
+            progressSection.classList.add('hidden');
+            
+            convertToVideoBtn.classList.add('hidden');
+            downloadVideoBtn.classList.remove('hidden');
+            downloadBtn.classList.add('hidden');
+            
+            generateBtn.disabled = false;
+            
+            const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
+            const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
+            fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+            
+            resultSection.scrollIntoView({ behavior: 'smooth' });
+        };
+        
+        mediaRecorder.start();
+        
+        updateProgress(50, '녹화 중...');
+        
+        // Render frames
+        const totalFrames = frames.length * 2; // Loop twice
+        for (let i = 0; i < totalFrames; i++) {
+            const frameIndex = i % frames.length;
+            
+            recordCtx.clearRect(0, 0, recordCanvas.width, recordCanvas.height);
+            recordCtx.drawImage(canvases[frameIndex], 0, 0);
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            const progress = 50 + Math.round(((i + 1) / totalFrames) * 40);
+            updateProgress(progress, `녹화 중... ${i + 1}/${totalFrames}`);
+        }
+        
+        updateProgress(95, '마무리 중...');
+        mediaRecorder.stop();
+        
+    } catch (error) {
+        console.error('동영상 생성 오류:', error);
+        alert(`동영상 생성 중 오류가 발생했습니다.\n\n${error.message}`);
+        generateBtn.disabled = false;
+        progressSection.classList.add('hidden');
     }
 }
