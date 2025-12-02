@@ -239,7 +239,7 @@ async function generateGIF() {
             workers: 2,
             quality: quality,
             width: width,
-            workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js',
+            workerScript: '/static/gif.worker.js',
             repeat: repeat
         });
         
