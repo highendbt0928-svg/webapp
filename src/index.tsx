@@ -6,6 +6,289 @@ const app = new Hono()
 // Enable CORS for API routes
 app.use('/api/*', cors())
 
+// Watermark Remover API
+app.post('/api/remove-watermark', async (c) => {
+  try {
+    const { imageUrl } = await c.req.json()
+    
+    if (!imageUrl) {
+      return c.json({ error: '이미지 URL이 필요합니다.' }, 400)
+    }
+
+    // Return the image URL for frontend processing
+    // Frontend will handle the actual watermark removal using image generation API
+    return c.json({ 
+      success: true,
+      imageUrl: imageUrl
+    })
+  } catch (error) {
+    console.error('Error:', error)
+    return c.json({ error: '워터마크 제거 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// Watermark Remover page
+app.get('/watermark-remover', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>워터마크 제거기 - AI 기반 자연스러운 복원</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✨</text></svg>">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            .drop-zone {
+                border: 2px dashed #cbd5e0;
+                transition: all 0.3s ease;
+            }
+            .drop-zone.drag-over {
+                border-color: #4299e1;
+                background-color: #ebf8ff;
+            }
+            .canvas-container {
+                position: relative;
+                display: inline-block;
+                max-width: 100%;
+            }
+            .watermark-overlay {
+                position: absolute;
+                border: 3px solid #ef4444;
+                background: rgba(239, 68, 68, 0.2);
+                cursor: move;
+                box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+                z-index: 10;
+            }
+            .resize-handle {
+                position: absolute;
+                width: 12px;
+                height: 12px;
+                background: #ef4444;
+                border: 2px solid white;
+                border-radius: 50%;
+                cursor: nwse-resize;
+                right: -6px;
+                bottom: -6px;
+            }
+            .image-item {
+                transition: all 0.2s ease;
+                aspect-ratio: 1;
+            }
+            .image-item:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            .image-item.dragging {
+                opacity: 0.5;
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold">
+                            <i class="fas fa-magic mr-2"></i>
+                            AI 지우개 - 워터마크 제거
+                        </h1>
+                        <p class="text-purple-100 mt-1">브러시로 칠하면 AI가 주변을 분석하여 자연스럽게 복원합니다</p>
+                    </div>
+                    <a href="/" class="bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-purple-50 transition">
+                        <i class="fas fa-home mr-2"></i>
+                        GIF Maker
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 py-8">
+            <!-- Info Banner -->
+            <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-purple-500 p-6 rounded-lg shadow-md mb-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-2">
+                    <i class="fas fa-info-circle mr-2 text-purple-600"></i>
+                    AI 지우개란?
+                </h2>
+                <ul class="text-sm text-gray-700 space-y-1">
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>마우스나 터치로 워터마크를 직접 칠하면 AI가 자동으로 제거합니다</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>주변 이미지의 색상, 질감, 패턴을 분석하여 자연스럽게 복원합니다</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>여러 이미지에 같은 위치의 워터마크가 있으면 일괄 처리도 가능합니다</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>실행취소/다시실행으로 정확하게 조정할 수 있습니다</li>
+                </ul>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-upload mr-2 text-blue-600"></i>
+                    이미지 업로드
+                </h2>
+                
+                <div id="dropZone" class="drop-zone rounded-lg p-12 text-center cursor-pointer mb-4">
+                    <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                    <p class="text-lg text-gray-700 mb-2">이미지를 드래그 앤 드롭하거나 클릭하여 선택</p>
+                    <p class="text-sm text-gray-500">JPG, PNG 파일 지원 (다중 선택 가능)</p>
+                    <input type="file" id="fileInput" class="hidden" accept="image/jpeg,image/png" multiple>
+                </div>
+
+                <button id="selectFileBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition">
+                    <i class="fas fa-folder-open mr-2"></i>
+                    파일 선택 (여러 개 선택 가능)
+                </button>
+            </div>
+
+            <!-- Images List Section -->
+            <div id="imagesSection" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">
+                        <i class="fas fa-images mr-2 text-green-600"></i>
+                        업로드된 이미지
+                        <span id="imageCount" class="text-sm text-gray-500 ml-2">(0개)</span>
+                    </h2>
+                    <button id="clearImagesBtn" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">
+                        <i class="fas fa-trash mr-2"></i>
+                        모두 삭제
+                    </button>
+                </div>
+                
+                <div class="bg-purple-50 border-l-4 border-purple-500 p-4 mb-4 rounded">
+                    <p class="text-sm text-purple-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>팁:</strong> 이미지를 클릭하여 선택하고, 드래그하여 순서를 변경하세요!
+                    </p>
+                </div>
+                
+                <div id="imagesList" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+            </div>
+
+            <!-- Canvas Section - AI Eraser -->
+            <div id="canvasSection" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">
+                        <i class="fas fa-paint-brush mr-2 text-red-600"></i>
+                        AI 지우개로 워터마크 칠하기
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <button id="prevImageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg transition">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="currentImageInfo" class="text-sm font-semibold text-gray-700 min-w-[60px] text-center">1 / 1</span>
+                        <button id="nextImageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg transition">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-4 mb-4 rounded">
+                    <p class="text-sm text-red-800 mb-2">
+                        <i class="fas fa-magic mr-2"></i>
+                        <strong>AI 지우개 사용법:</strong>
+                    </p>
+                    <ul class="text-xs text-red-700 space-y-1 ml-6">
+                        <li>🖌️ 마우스나 터치로 워터마크 영역을 빨간색으로 칠해주세요</li>
+                        <li>🎯 AI가 주변 패턴을 분석하여 자연스럽게 복원합니다</li>
+                        <li>↩️ 실행취소/다시실행으로 마스크를 수정할 수 있습니다</li>
+                        <li>📋 '모든 이미지에 적용'으로 같은 위치의 워터마크를 일괄 제거</li>
+                    </ul>
+                </div>
+
+                <!-- Brush Controls -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-circle text-red-500 mr-1"></i>
+                                브러시 크기
+                            </label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="brushSize" min="5" max="100" value="30" 
+                                    class="flex-1 h-2 bg-red-200 rounded-lg appearance-none cursor-pointer">
+                                <span id="brushSizeValue" class="text-sm font-semibold text-gray-700 min-w-[50px]">30px</span>
+                            </div>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button id="undoBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                                <i class="fas fa-undo mr-1"></i>
+                                실행취소
+                            </button>
+                            <button id="redoBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                                <i class="fas fa-redo mr-1"></i>
+                                다시실행
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <button id="clearMaskBtn" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-eraser mr-1"></i>
+                            마스크 지우기
+                        </button>
+                        <button id="applyMaskToAllBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-copy mr-1"></i>
+                            모든 이미지에 적용
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Canvas Container -->
+                <div id="canvasContainer" class="mb-4 text-center bg-gray-100 rounded-lg p-4">
+                    <p class="text-gray-500">이미지를 로딩 중...</p>
+                </div>
+
+                <!-- Action Button -->
+                <button id="removeAllWatermarksBtn" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition text-lg shadow-lg">
+                    <i class="fas fa-wand-magic-sparkles mr-2"></i>
+                    AI로 워터마크 제거하기
+                </button>
+                
+                <div id="progressSection" class="hidden mt-4">
+                    <div class="bg-gray-200 rounded-full h-4 overflow-hidden">
+                        <div id="progressBar" class="bg-gradient-to-r from-purple-600 to-pink-600 h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="text-center text-sm text-gray-600 mt-2">처리 중...</p>
+                </div>
+            </div>
+
+            <!-- Result Section -->
+            <div id="resultSection" class="bg-white rounded-lg shadow-md p-6 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">
+                        <i class="fas fa-check-circle mr-2 text-green-600"></i>
+                        처리 완료
+                    </h2>
+                    <button id="downloadAllBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+                        <i class="fas fa-download mr-2"></i>
+                        전체 다운로드
+                    </button>
+                </div>
+                
+                <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-4"></div>
+                
+                <div class="flex justify-center">
+                    <button id="resetBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition">
+                        <i class="fas fa-redo mr-2"></i>
+                        새로 시작
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t mt-12">
+            <div class="max-w-7xl mx-auto px-4 py-6 text-center text-gray-600">
+                <p>© 2025 Watermark Remover. Powered by AI</p>
+            </div>
+        </footer>
+
+        <script src="/static/watermark-remover.js"></script>
+    </body>
+    </html>
+  `)
+})
+
 // Main page
 app.get('/', (c) => {
   return c.html(`
@@ -59,11 +342,19 @@ app.get('/', (c) => {
         <!-- Header -->
         <header class="bg-white shadow-sm">
             <div class="max-w-7xl mx-auto px-4 py-6">
-                <h1 class="text-3xl font-bold text-gray-900">
-                    <i class="fas fa-magic mr-2 text-purple-600"></i>
-                    GIF Maker
-                </h1>
-                <p class="text-gray-600 mt-1">이미지를 업로드하여 애니메이션 GIF를 만들어보세요</p>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">
+                            <i class="fas fa-magic mr-2 text-purple-600"></i>
+                            GIF Maker
+                        </h1>
+                        <p class="text-gray-600 mt-1">이미지를 업로드하여 애니메이션 GIF를 만들어보세요</p>
+                    </div>
+                    <a href="/watermark-remover" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition">
+                        <i class="fas fa-sparkles mr-2"></i>
+                        워터마크 제거기
+                    </a>
+                </div>
             </div>
         </header>
 
