@@ -6,6 +6,34 @@ let frames = [];
 let draggedIndex = null;
 let conversionMode = 'image-to-gif'; // Default mode
 
+// Track created object URLs for cleanup
+let objectURLs = [];
+
+// Cleanup function for object URLs to prevent memory leaks
+function cleanupObjectURLs() {
+    objectURLs.forEach(url => {
+        try {
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.warn('Failed to revoke URL:', e);
+        }
+    });
+    objectURLs = [];
+}
+
+// Create and track object URL
+function createTrackedObjectURL(blob) {
+    const url = URL.createObjectURL(blob);
+    objectURLs.push(url);
+    return url;
+}
+
+// Expose removeFrame to global scope for onclick handlers
+window.removeFrame = function(index) {
+    frames.splice(index, 1);
+    updateFramesList();
+};
+
 // DOM Elements
 const modeRadios = document.querySelectorAll('.mode-radio');
 const uploadTitle = document.getElementById('uploadTitle');
@@ -323,10 +351,7 @@ function updateFramesList() {
     });
 }
 
-function removeFrame(index) {
-    frames.splice(index, 1);
-    updateFramesList();
-}
+// removeFrame is now defined in global scope at the top
 
 function clearFrames() {
     if (confirm('모든 프레임을 삭제하시겠습니까?')) {
@@ -453,56 +478,61 @@ async function generateGIF() {
         // Add frames with optional crossfade
         if (enableCrossfade && frames.length > 1) {
             console.log(`크로스페이드 효과 적용 (전환 프레임: ${crossfadeFrames})`);
-            
+
             // Easing function for smoother transitions (ease-in-out)
             const easeInOutCubic = (t) => {
                 return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
             };
-            
+
+            // Reusable canvas for transitions - improves performance
+            const transitionCanvas = document.createElement('canvas');
+            transitionCanvas.width = canvases[0].width;
+            transitionCanvas.height = canvases[0].height;
+            const transitionCtx = transitionCanvas.getContext('2d');
+
             for (let i = 0; i < frames.length; i++) {
                 try {
                     // Add main frame with longer display time
                     const mainFrameDelay = Math.floor(delay * 0.7); // 70% of total delay for main frame
                     gif.addFrame(canvases[i], { delay: mainFrameDelay, copy: true });
-                    
+
                     // Add crossfade frames between this and next frame
                     if (i < frames.length - 1) {
                         const nextCanvas = canvases[i + 1];
                         const transitionTotalDelay = delay - mainFrameDelay; // 30% for transition
                         const transitionDelay = Math.floor(transitionTotalDelay / crossfadeFrames);
-                        
-                        for (let t = 1; t <= crossfadeFrames; t++) {
-                            const transitionCanvas = document.createElement('canvas');
+
+                        // Resize transition canvas if needed
+                        if (transitionCanvas.width !== canvases[i].width ||
+                            transitionCanvas.height !== canvases[i].height) {
                             transitionCanvas.width = canvases[i].width;
                             transitionCanvas.height = canvases[i].height;
-                            const transitionCtx = transitionCanvas.getContext('2d');
-                            
+                        }
+
+                        for (let t = 1; t <= crossfadeFrames; t++) {
                             // Apply easing function for smoother transition
                             const progress = t / (crossfadeFrames + 1);
                             const easedProgress = easeInOutCubic(progress);
-                            
+
                             // Clear canvas
                             transitionCtx.clearRect(0, 0, transitionCanvas.width, transitionCanvas.height);
-                            
+
                             // Draw current frame
                             transitionCtx.globalAlpha = 1 - easedProgress;
                             transitionCtx.globalCompositeOperation = 'source-over';
                             transitionCtx.drawImage(canvases[i], 0, 0);
-                            
+
                             // Draw next frame with blending
                             transitionCtx.globalAlpha = easedProgress;
                             transitionCtx.globalCompositeOperation = 'source-over';
                             transitionCtx.drawImage(nextCanvas, 0, 0);
-                            
+
                             transitionCtx.globalAlpha = 1.0;
-                            
+
                             gif.addFrame(transitionCanvas, { delay: transitionDelay, copy: true });
                         }
-                    } else {
-                        // Last frame - no transition needed, use full delay
-                        // Already added with mainFrameDelay above
                     }
-                    
+
                     const progress = Math.round(((i + 1) / frames.length) * 50);
                     updateProgress(progress, `프레임 처리 중... ${i + 1}/${frames.length}`);
                 } catch (frameError) {
@@ -535,19 +565,19 @@ async function generateGIF() {
         
         gif.on('finished', (blob) => {
             console.log('GIF finished! Size:', blob.size, 'bytes');
-            const url = URL.createObjectURL(blob);
+            const url = createTrackedObjectURL(blob);
             resultGif.src = url;
             resultSection.classList.remove('hidden');
             progressSection.classList.add('hidden');
             generateBtn.disabled = false;
-            
+
             const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
             const sizeKB = (blob.size / 1024).toFixed(2);
             fileSize.textContent = `파일 크기: ${sizeMB > 1 ? sizeMB + ' MB' : sizeKB + ' KB'}`;
-            
+
             // Store blob for download
             resultGif.blob = blob;
-            
+
             // Scroll to result
             resultSection.scrollIntoView({ behavior: 'smooth' });
         });
@@ -576,15 +606,29 @@ function updateProgress(percent, text) {
 function downloadGIF() {
     if (resultGif.blob) {
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(resultGif.blob);
+        const url = URL.createObjectURL(resultGif.blob);
+        a.href = url;
         a.download = `gif-${Date.now()}.gif`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        // Clean up after download
+        setTimeout(() => URL.revokeObjectURL(url), 100);
     }
 }
 
 function reset() {
+    // Clean up memory before resetting
+    cleanupObjectURLs();
+
+    // Clear previous results
+    if (resultGif.src && resultGif.src.startsWith('blob:')) {
+        URL.revokeObjectURL(resultGif.src);
+    }
+    if (resultVideo.src && resultVideo.src.startsWith('blob:')) {
+        URL.revokeObjectURL(resultVideo.src);
+    }
+
     frames = [];
     updateFramesList();
     resultSection.classList.add('hidden');
@@ -592,6 +636,7 @@ function reset() {
     resultVideo.classList.add('hidden');
     downloadVideoBtn.classList.add('hidden');
     convertToVideoBtn.classList.remove('hidden');
+    downloadBtn.classList.remove('hidden');
     fileInput.value = '';
 }
 
@@ -601,38 +646,53 @@ async function convertToVideo() {
         alert('먼저 GIF를 생성해주세요.');
         return;
     }
-    
+
+    // Check MediaRecorder support
+    if (typeof MediaRecorder === 'undefined') {
+        alert('이 브라우저는 동영상 변환을 지원하지 않습니다.\nChrome 또는 Firefox를 사용해주세요.');
+        return;
+    }
+
     try {
         conversionProgress.classList.remove('hidden');
         conversionText.textContent = 'GIF를 분석하는 중...';
         convertToVideoBtn.disabled = true;
-        
+
         // Create a temporary image to load the GIF
         const img = new Image();
-        const gifUrl = URL.createObjectURL(resultGif.blob);
-        
+        const gifUrl = createTrackedObjectURL(resultGif.blob);
+
         await new Promise((resolve, reject) => {
             img.onload = resolve;
-            img.onerror = reject;
+            img.onerror = () => reject(new Error('GIF 이미지 로드 실패'));
             img.src = gifUrl;
         });
-        
+
         conversionText.textContent = '동영상으로 변환 중...';
-        
+
         // Create canvas with same dimensions as GIF
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-        
+
         // Get frame delay from settings
         const delay = parseInt(frameDelayInput.value);
-        const fps = Math.round(1000 / delay);
-        
+        const fps = Math.max(1, Math.min(30, Math.round(1000 / delay)));
+
+        // Check for MediaRecorder codec support
+        let mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm;codecs=vp8';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm';
+            }
+        }
+
         // Create video stream from canvas
         const stream = canvas.captureStream(fps);
         const mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm;codecs=vp9',
+            mimeType: mimeType,
             videoBitsPerSecond: 2500000
         });
         
@@ -645,25 +705,23 @@ async function convertToVideo() {
         
         mediaRecorder.onstop = async () => {
             const webmBlob = new Blob(chunks, { type: 'video/webm' });
-            
+
             // Display video
-            const videoUrl = URL.createObjectURL(webmBlob);
+            const videoUrl = createTrackedObjectURL(webmBlob);
             resultVideo.src = videoUrl;
             resultVideo.blob = webmBlob;
-            
+
             resultGif.classList.add('hidden');
             resultVideo.classList.remove('hidden');
             convertToVideoBtn.classList.add('hidden');
             downloadVideoBtn.classList.remove('hidden');
-            
+
             conversionProgress.classList.add('hidden');
             convertToVideoBtn.disabled = false;
-            
+
             const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
             const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
             fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
-            
-            URL.revokeObjectURL(gifUrl);
         };
         
         // Start recording
@@ -702,30 +760,34 @@ async function convertToVideo() {
 function downloadVideo() {
     if (resultVideo.blob) {
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(resultVideo.blob);
+        const url = URL.createObjectURL(resultVideo.blob);
+        a.href = url;
         a.download = `video-${Date.now()}.webm`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        // Clean up after download
+        setTimeout(() => URL.revokeObjectURL(url), 100);
     }
 }
 
 // Direct GIF to Video conversion
+// Note: This uses browser's native GIF rendering for animation
 async function handleGifToVideo(file) {
     if (!file || file.type !== 'image/gif') {
         alert('GIF 파일만 업로드 가능합니다.');
         return;
     }
-    
+
     try {
         // Hide frames section, show result preparation
         framesSection.classList.add('hidden');
         settingsSection.classList.add('hidden');
         generateSection.classList.add('hidden');
-        
+
         progressSection.classList.remove('hidden');
         updateProgress(10, 'GIF 파일 로드 중...');
-        
+
         // Read GIF file
         const reader = new FileReader();
         const gifData = await new Promise((resolve, reject) => {
@@ -733,79 +795,101 @@ async function handleGifToVideo(file) {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
-        
+
         updateProgress(30, 'GIF 분석 중...');
-        
-        // Create image to load GIF
-        const img = new Image();
+
+        // Create image to load GIF - use an img element to render GIF animation
+        const img = document.createElement('img');
+        img.style.display = 'none';
+        document.body.appendChild(img);
+
         await new Promise((resolve, reject) => {
             img.onload = resolve;
             img.onerror = reject;
             img.src = gifData;
         });
-        
+
         updateProgress(50, '동영상으로 변환 중...');
-        
+
         // Create canvas for rendering
         const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
         const ctx = canvas.getContext('2d');
-        
-        // Start recording
-        const stream = canvas.captureStream(10); // 10 FPS
+
+        // Check for MediaRecorder codec support
+        let mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm;codecs=vp8';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm';
+            }
+        }
+
+        // Start recording at 15 FPS for smoother animation
+        const fps = 15;
+        const stream = canvas.captureStream(fps);
         const mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm;codecs=vp9',
-            videoBitsPerSecond: 2500000
+            mimeType: mimeType,
+            videoBitsPerSecond: 3000000
         });
-        
+
         const chunks = [];
         mediaRecorder.ondataavailable = (e) => {
             if (e.data.size > 0) {
                 chunks.push(e.data);
             }
         };
-        
+
         mediaRecorder.onstop = () => {
             const webmBlob = new Blob(chunks, { type: 'video/webm' });
-            const videoUrl = URL.createObjectURL(webmBlob);
-            
+            const videoUrl = createTrackedObjectURL(webmBlob);
+
             resultVideo.src = videoUrl;
             resultVideo.blob = webmBlob;
-            
+
             // Show result
             resultGif.classList.add('hidden');
             resultVideo.classList.remove('hidden');
             resultSection.classList.remove('hidden');
             progressSection.classList.add('hidden');
-            
+
             convertToVideoBtn.classList.add('hidden');
             downloadVideoBtn.classList.remove('hidden');
             downloadBtn.classList.add('hidden');
-            
+
             const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
             const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
             fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+
+            // Clean up temporary image element
+            document.body.removeChild(img);
         };
-        
-        mediaRecorder.start();
-        
+
+        mediaRecorder.start(100); // Request data every 100ms for smoother encoding
+
         updateProgress(70, '녹화 중...');
-        
-        // Draw GIF frames (animate for 3 seconds)
-        const duration = 3000;
-        const frameTime = 100;
-        const totalFrames = duration / frameTime;
-        
+
+        // Draw GIF frames (animate for 4 seconds for better coverage)
+        const duration = 4000;
+        const frameTime = Math.floor(1000 / fps);
+        const totalFrames = Math.ceil(duration / frameTime);
+
         for (let i = 0; i < totalFrames; i++) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             await new Promise(resolve => setTimeout(resolve, frameTime));
+
+            // Update progress
+            if (i % 5 === 0) {
+                const progress = 70 + Math.round((i / totalFrames) * 20);
+                updateProgress(progress, `녹화 중... ${Math.round((i / totalFrames) * 100)}%`);
+            }
         }
-        
-        updateProgress(90, '마무리 중...');
+
+        updateProgress(95, '마무리 중...');
         mediaRecorder.stop();
-        
+
     } catch (error) {
         console.error('GIF to Video 변환 오류:', error);
         alert(`변환 중 오류가 발생했습니다.\n\n${error.message}`);
@@ -819,12 +903,18 @@ async function generateVideoDirectly() {
         alert('최소 1개의 이미지를 업로드해주세요.');
         return;
     }
-    
+
+    // Check MediaRecorder support
+    if (typeof MediaRecorder === 'undefined') {
+        alert('이 브라우저는 동영상 생성을 지원하지 않습니다.\nChrome 또는 Firefox를 사용해주세요.');
+        return;
+    }
+
     try {
         generateBtn.disabled = true;
         progressSection.classList.remove('hidden');
         resultSection.classList.add('hidden');
-        
+
         const delay = parseInt(frameDelayInput.value);
         const width = parseInt(gifWidthInput.value);
         
@@ -846,17 +936,27 @@ async function generateVideoDirectly() {
         }
         
         updateProgress(30, '동영상 생성 중...');
-        
+
         // Create recording canvas
         const recordCanvas = document.createElement('canvas');
         recordCanvas.width = canvases[0].width;
         recordCanvas.height = canvases[0].height;
         const recordCtx = recordCanvas.getContext('2d');
-        
-        const fps = Math.round(1000 / delay);
+
+        const fps = Math.max(1, Math.min(30, Math.round(1000 / delay)));
+
+        // Check for MediaRecorder codec support
+        let mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm;codecs=vp8';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm';
+            }
+        }
+
         const stream = recordCanvas.captureStream(fps);
         const mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm;codecs=vp9',
+            mimeType: mimeType,
             videoBitsPerSecond: 2500000
         });
         
@@ -869,33 +969,33 @@ async function generateVideoDirectly() {
         
         mediaRecorder.onstop = () => {
             const webmBlob = new Blob(chunks, { type: 'video/webm' });
-            const videoUrl = URL.createObjectURL(webmBlob);
-            
+            const videoUrl = createTrackedObjectURL(webmBlob);
+
             resultVideo.src = videoUrl;
             resultVideo.blob = webmBlob;
-            
+
             resultGif.classList.add('hidden');
             resultVideo.classList.remove('hidden');
             resultSection.classList.remove('hidden');
             progressSection.classList.add('hidden');
-            
+
             convertToVideoBtn.classList.add('hidden');
             downloadVideoBtn.classList.remove('hidden');
             downloadBtn.classList.add('hidden');
-            
+
             generateBtn.disabled = false;
-            
+
             const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
             const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
             fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
-            
+
             resultSection.scrollIntoView({ behavior: 'smooth' });
         };
-        
-        mediaRecorder.start();
-        
+
+        mediaRecorder.start(100); // Request data every 100ms
+
         updateProgress(50, '녹화 중...');
-        
+
         // Render frames
         const totalFrames = frames.length * 2; // Loop twice
         for (let i = 0; i < totalFrames; i++) {
