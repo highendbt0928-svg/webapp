@@ -1,0 +1,21 @@
+{
+  "name": "GIF Maker",
+  "short_name": "GIF Maker",
+  "description": "이미지를 GIF 또는 동영상으로 변환하는 무료 온라인 도구",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#9333ea",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "photo"],
+  "lang": "ko",
+  "dir": "ltr"
+}

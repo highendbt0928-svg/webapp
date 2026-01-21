@@ -13,12 +13,44 @@ app.get('/', (c) => {
     <html lang="ko">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+        <meta name="description" content="이미지를 GIF 또는 동영상으로 변환하는 무료 온라인 도구">
+        <meta name="theme-color" content="#9333ea">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="GIF Maker">
         <title>GIF Maker - 이미지를 GIF로 변환</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎬</text></svg>">
+        <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎬</text></svg>">
+        <link rel="manifest" href="/manifest.json">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
+            /* Skip to main content for accessibility */
+            .skip-link {
+                position: absolute;
+                top: -40px;
+                left: 0;
+                background: #9333ea;
+                color: white;
+                padding: 8px;
+                z-index: 100;
+                transition: top 0.3s;
+            }
+            .skip-link:focus {
+                top: 0;
+            }
+            /* Focus visible styles for accessibility */
+            *:focus-visible {
+                outline: 3px solid #9333ea;
+                outline-offset: 2px;
+            }
+            /* Touch-friendly tap targets */
+            @media (max-width: 768px) {
+                button, .mode-card, .frame-item {
+                    min-height: 44px;
+                }
+            }
             .drop-zone {
                 border: 2px dashed #cbd5e0;
                 transition: all 0.3s ease;
@@ -56,8 +88,11 @@ app.get('/', (c) => {
         </style>
     </head>
     <body class="bg-gray-50 min-h-screen">
+        <!-- Skip to main content for accessibility -->
+        <a href="#main-content" class="skip-link">메인 콘텐츠로 건너뛰기</a>
+
         <!-- Header -->
-        <header class="bg-white shadow-sm">
+        <header class="bg-white shadow-sm" role="banner">
             <div class="max-w-7xl mx-auto px-4 py-6">
                 <h1 class="text-3xl font-bold text-gray-900">
                     <i class="fas fa-magic mr-2 text-purple-600"></i>
@@ -68,7 +103,7 @@ app.get('/', (c) => {
         </header>
 
         <!-- Main Content -->
-        <main class="max-w-7xl mx-auto px-4 py-8">
+        <main id="main-content" class="max-w-7xl mx-auto px-4 py-8" role="main">
             <!-- Mode Selection -->
             <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-md p-6 mb-6">
                 <h2 class="text-xl font-semibold mb-4 text-center">
@@ -233,6 +268,25 @@ app.get('/', (c) => {
                             </div>
                         </div>
                         <input type="hidden" id="gifQuality" value="10">
+                    </div>
+
+                    <!-- Filter Effect -->
+                    <div>
+                        <label for="filterSelect" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-palette mr-1 text-pink-500"></i>
+                            필터 효과
+                        </label>
+                        <select id="filterSelect"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                            aria-describedby="filterDesc">
+                            <option value="none">없음 (원본)</option>
+                            <option value="grayscale">흑백</option>
+                            <option value="sepia">세피아</option>
+                            <option value="brightness">밝게</option>
+                            <option value="contrast">고대비</option>
+                            <option value="vintage">빈티지</option>
+                        </select>
+                        <p id="filterDesc" class="text-xs text-gray-500 mt-1">GIF/동영상에 적용할 필터를 선택하세요</p>
                     </div>
 
                     <!-- Crossfade Effect -->

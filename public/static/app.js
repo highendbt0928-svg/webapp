@@ -1,13 +1,228 @@
 // Check if gif.js is loaded
 console.log('GIF.js loaded:', typeof GIF !== 'undefined');
 
+// Constants
+const MAX_IMAGE_SIZE = 2048; // Max dimension for uploaded images
+const STORAGE_KEY = 'gifmaker_settings';
+
 // State
 let frames = [];
 let draggedIndex = null;
 let conversionMode = 'image-to-gif'; // Default mode
+let currentFilter = 'none'; // Filter state
 
 // Track created object URLs for cleanup
 let objectURLs = [];
+
+// ==========================================
+// Settings Storage (LocalStorage)
+// ==========================================
+function saveSettings() {
+    const settings = {
+        frameSpeed: document.getElementById('frameSpeed')?.value,
+        speedDirectInput: document.getElementById('speedDirectInput')?.value,
+        gifSizePreset: document.getElementById('gifSizePreset')?.value,
+        gifWidth: document.getElementById('gifWidth')?.value,
+        qualitySlider: document.getElementById('qualitySlider')?.value,
+        loopCount: document.getElementById('loopCount')?.value,
+        enableCrossfade: document.getElementById('enableCrossfade')?.checked,
+        crossfadeFrames: document.getElementById('crossfadeFrames')?.value,
+        currentFilter: currentFilter
+    };
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch (e) {
+        console.warn('Failed to save settings:', e);
+    }
+}
+
+function loadSettings() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const settings = JSON.parse(saved);
+            return settings;
+        }
+    } catch (e) {
+        console.warn('Failed to load settings:', e);
+    }
+    return null;
+}
+
+function applySettings(settings) {
+    if (!settings) return;
+
+    if (settings.frameSpeed) {
+        const el = document.getElementById('frameSpeed');
+        if (el) el.value = settings.frameSpeed;
+    }
+    if (settings.speedDirectInput) {
+        const el = document.getElementById('speedDirectInput');
+        if (el) el.value = settings.speedDirectInput;
+    }
+    if (settings.gifSizePreset) {
+        const el = document.getElementById('gifSizePreset');
+        if (el) {
+            el.value = settings.gifSizePreset;
+            if (settings.gifSizePreset === 'custom') {
+                document.getElementById('gifWidth')?.classList.remove('hidden');
+            }
+        }
+    }
+    if (settings.gifWidth) {
+        const el = document.getElementById('gifWidth');
+        if (el) el.value = settings.gifWidth;
+    }
+    if (settings.qualitySlider) {
+        const el = document.getElementById('qualitySlider');
+        if (el) el.value = settings.qualitySlider;
+    }
+    if (settings.loopCount !== undefined) {
+        const el = document.getElementById('loopCount');
+        if (el) el.value = settings.loopCount;
+    }
+    if (settings.enableCrossfade !== undefined) {
+        const el = document.getElementById('enableCrossfade');
+        if (el) {
+            el.checked = settings.enableCrossfade;
+            if (settings.enableCrossfade) {
+                document.getElementById('crossfadeSettings')?.classList.remove('hidden');
+            }
+        }
+    }
+    if (settings.crossfadeFrames) {
+        const el = document.getElementById('crossfadeFrames');
+        if (el) el.value = settings.crossfadeFrames;
+    }
+    if (settings.currentFilter) {
+        currentFilter = settings.currentFilter;
+        const el = document.getElementById('filterSelect');
+        if (el) el.value = currentFilter;
+    }
+}
+
+// ==========================================
+// Image Optimization
+// ==========================================
+async function optimizeImage(file, maxSize = MAX_IMAGE_SIZE) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                // Check if resize is needed
+                if (img.width <= maxSize && img.height <= maxSize) {
+                    resolve({ dataUrl: e.target.result, image: img, optimized: false });
+                    return;
+                }
+
+                // Calculate new dimensions
+                let newWidth, newHeight;
+                if (img.width > img.height) {
+                    newWidth = maxSize;
+                    newHeight = Math.round((img.height / img.width) * maxSize);
+                } else {
+                    newHeight = maxSize;
+                    newWidth = Math.round((img.width / img.height) * maxSize);
+                }
+
+                // Create optimized canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                const ctx = canvas.getContext('2d');
+
+                // Use high quality scaling
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+                // Convert to data URL
+                const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+                // Create new image from optimized data
+                const optimizedImg = new Image();
+                optimizedImg.onload = () => {
+                    resolve({ dataUrl: optimizedDataUrl, image: optimizedImg, optimized: true });
+                };
+                optimizedImg.onerror = reject;
+                optimizedImg.src = optimizedDataUrl;
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ==========================================
+// Filter Effects
+// ==========================================
+const filters = {
+    none: (ctx, canvas) => { /* No filter */ },
+    grayscale: (ctx, canvas) => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            data[i] = data[i + 1] = data[i + 2] = avg;
+        }
+        ctx.putImageData(imageData, 0, 0);
+    },
+    sepia: (ctx, canvas) => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            data[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+            data[i + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+            data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+        }
+        ctx.putImageData(imageData, 0, 0);
+    },
+    brightness: (ctx, canvas) => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const brightness = 30;
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, data[i] + brightness);
+            data[i + 1] = Math.min(255, data[i + 1] + brightness);
+            data[i + 2] = Math.min(255, data[i + 2] + brightness);
+        }
+        ctx.putImageData(imageData, 0, 0);
+    },
+    contrast: (ctx, canvas) => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const factor = 1.3;
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
+            data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
+            data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128));
+        }
+        ctx.putImageData(imageData, 0, 0);
+    },
+    vintage: (ctx, canvas) => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            data[i] = Math.min(255, r * 0.9 + 40);
+            data[i + 1] = Math.min(255, g * 0.7 + 20);
+            data[i + 2] = Math.min(255, b * 0.5);
+        }
+        ctx.putImageData(imageData, 0, 0);
+    }
+};
+
+function applyFilter(canvas, filterName) {
+    if (filterName === 'none' || !filters[filterName]) return canvas;
+
+    const ctx = canvas.getContext('2d');
+    filters[filterName](ctx, canvas);
+    return canvas;
+}
 
 // Cleanup function for object URLs to prevent memory leaks
 function cleanupObjectURLs() {
@@ -78,6 +293,7 @@ const gifQualityInput = document.getElementById('gifQuality');
 const enableCrossfadeInput = document.getElementById('enableCrossfade');
 const crossfadeFramesInput = document.getElementById('crossfadeFrames');
 const crossfadeSettings = document.getElementById('crossfadeSettings');
+const filterSelect = document.getElementById('filterSelect');
 
 // Event Listeners
 // Mode selection
@@ -107,13 +323,27 @@ enableCrossfadeInput.addEventListener('change', (e) => {
     } else {
         crossfadeSettings.classList.add('hidden');
     }
+    saveSettings();
 });
 
 // Update crossfade value display
 const crossfadeValue = document.getElementById('crossfadeValue');
 crossfadeFramesInput.addEventListener('input', (e) => {
     crossfadeValue.textContent = e.target.value;
+    saveSettings();
 });
+
+// Filter selection
+if (filterSelect) {
+    filterSelect.addEventListener('change', (e) => {
+        currentFilter = e.target.value;
+        saveSettings();
+        // Update preview if frames exist
+        if (frames.length > 0) {
+            updateFramesList();
+        }
+    });
+}
 
 // Frame speed converter
 function updateFrameSpeed(fromDirect = false) {
@@ -172,10 +402,16 @@ function updateFrameSpeed(fromDirect = false) {
 updateFrameSpeed();
 
 // Update on slider change
-frameSpeedInput.addEventListener('input', () => updateFrameSpeed(false));
+frameSpeedInput.addEventListener('input', () => {
+    updateFrameSpeed(false);
+    saveSettings();
+});
 
 // Update on direct input change
-speedDirectInput.addEventListener('input', () => updateFrameSpeed(true));
+speedDirectInput.addEventListener('input', () => {
+    updateFrameSpeed(true);
+    saveSettings();
+});
 
 // GIF size preset handler
 gifSizePreset.addEventListener('change', (e) => {
@@ -186,7 +422,11 @@ gifSizePreset.addEventListener('change', (e) => {
         gifWidthInput.classList.add('hidden');
         gifWidthInput.value = value;
     }
+    saveSettings();
 });
+
+// Custom width change
+gifWidthInput.addEventListener('input', saveSettings);
 
 // Quality slider handler
 function updateQuality() {
@@ -213,7 +453,13 @@ function updateQuality() {
 updateQuality();
 
 // Update on slider change
-qualitySlider.addEventListener('input', updateQuality);
+qualitySlider.addEventListener('input', () => {
+    updateQuality();
+    saveSettings();
+});
+
+// Loop count change
+loopCountInput.addEventListener('input', saveSettings);
 
 // Mode handling
 function handleModeChange(e) {
@@ -281,24 +527,41 @@ function handleDrop(e) {
     addFiles(files);
 }
 
-function addFiles(files) {
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                frames.push({
-                    id: Date.now() + Math.random(),
-                    src: e.target.result,
-                    image: img,
-                    delay: 500
-                });
-                updateFramesList();
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
+async function addFiles(files) {
+    // Show loading indicator
+    const loadingCount = files.length;
+    let loadedCount = 0;
+
+    // Process files with optimization
+    for (const file of files) {
+        try {
+            const result = await optimizeImage(file, MAX_IMAGE_SIZE);
+
+            frames.push({
+                id: Date.now() + Math.random(),
+                src: result.dataUrl,
+                image: result.image,
+                delay: 500,
+                optimized: result.optimized
+            });
+
+            loadedCount++;
+            updateFramesList();
+
+            // Log optimization info
+            if (result.optimized) {
+                console.log(`Image optimized: ${file.name}`);
+            }
+        } catch (error) {
+            console.error(`Failed to load image: ${file.name}`, error);
+        }
+    }
+
+    // Show optimization summary
+    const optimizedCount = frames.filter(f => f.optimized).length;
+    if (optimizedCount > 0) {
+        console.log(`${optimizedCount} images were optimized for better performance`);
+    }
 }
 
 function updateFramesList() {
@@ -472,9 +735,15 @@ async function generateGIF() {
             canvas.height = Math.round(width * aspectRatio);
             
             ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
+
+            // Apply filter if selected
+            if (currentFilter && currentFilter !== 'none') {
+                applyFilter(canvas, currentFilter);
+            }
+
             canvases.push(canvas);
         }
-        
+
         // Add frames with optional crossfade
         if (enableCrossfade && frames.length > 1) {
             console.log(`크로스페이드 효과 적용 (전환 프레임: ${crossfadeFrames})`);
@@ -932,9 +1201,15 @@ async function generateVideoDirectly() {
             canvas.height = Math.round(width * aspectRatio);
             
             ctx.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
+
+            // Apply filter if selected
+            if (currentFilter && currentFilter !== 'none') {
+                applyFilter(canvas, currentFilter);
+            }
+
             canvases.push(canvas);
         }
-        
+
         updateProgress(30, '동영상 생성 중...');
 
         // Create recording canvas
@@ -1020,3 +1295,63 @@ async function generateVideoDirectly() {
         progressSection.classList.add('hidden');
     }
 }
+
+// ==========================================
+// Initialization
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Load saved settings
+    const savedSettings = loadSettings();
+    if (savedSettings) {
+        applySettings(savedSettings);
+        // Update displays after applying settings
+        updateFrameSpeed();
+        updateQuality();
+        console.log('Settings loaded from localStorage');
+    }
+
+    // Register keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + Enter to generate
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            if (frames.length > 0 && !generateBtn.disabled) {
+                e.preventDefault();
+                handleGenerate();
+            }
+        }
+        // Escape to close/reset
+        if (e.key === 'Escape') {
+            if (!resultSection.classList.contains('hidden')) {
+                reset();
+            }
+        }
+        // Delete to remove selected frame (when focused)
+        if (e.key === 'Delete' && document.activeElement?.closest('.frame-item')) {
+            const index = parseInt(document.activeElement.closest('.frame-item').dataset.index);
+            if (!isNaN(index)) {
+                window.removeFrame(index);
+            }
+        }
+    });
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+                console.log('Service Worker registered:', registration.scope);
+            })
+            .catch((error) => {
+                console.warn('Service Worker registration failed:', error);
+            });
+    }
+
+    // Handle online/offline status
+    window.addEventListener('online', () => {
+        console.log('App is online');
+    });
+    window.addEventListener('offline', () => {
+        console.log('App is offline - using cached resources');
+    });
+
+    console.log('GIF Maker initialized');
+});
