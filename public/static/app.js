@@ -273,9 +273,16 @@ function addFiles(files) {
     });
 }
 
+// Validate that a string is a safe data URL (prevents XSS via malicious src attributes)
+function isValidDataUrl(str) {
+    if (typeof str !== 'string') return false;
+    // Only allow data URLs with image MIME types
+    return /^data:image\/(png|jpeg|jpg|gif|webp|bmp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(str);
+}
+
 function updateFramesList() {
     frameCount.textContent = `(${frames.length}개)`;
-    
+
     if (frames.length > 0) {
         framesSection.classList.remove('hidden');
         settingsSection.classList.remove('hidden');
@@ -285,32 +292,63 @@ function updateFramesList() {
         settingsSection.classList.add('hidden');
         generateSection.classList.add('hidden');
     }
-    
-    framesList.innerHTML = frames.map((frame, index) => `
-        <div class="frame-item bg-white border-2 border-gray-300 rounded-lg p-2 cursor-move hover:border-purple-400 transition-all" 
-             draggable="true" 
-             data-index="${index}"
-             title="드래그하여 순서 변경">
-            <div class="relative">
-                <div class="absolute top-1 left-1 bg-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                    ${index + 1}
-                </div>
-                <div class="absolute top-1 right-1 bg-gray-800 bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                    <i class="fas fa-grip-vertical"></i>
-                </div>
-            </div>
-            <img src="${frame.src}" alt="Frame ${index + 1}" class="w-full h-32 object-cover rounded mb-2">
-            <div class="flex justify-between items-center mt-2">
-                <span class="text-xs text-gray-500">
-                    <i class="fas fa-arrows-alt mr-1"></i>
-                    드래그로 이동
-                </span>
-                <button class="text-red-600 hover:text-red-800 transition" onclick="removeFrame(${index})">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
+
+    // Clear existing content safely
+    framesList.innerHTML = '';
+
+    frames.forEach((frame, index) => {
+        // Validate frame.src to prevent XSS
+        if (!isValidDataUrl(frame.src)) {
+            console.warn(`Invalid data URL for frame ${index}, skipping`);
+            return;
+        }
+
+        const frameDiv = document.createElement('div');
+        frameDiv.className = 'frame-item bg-white border-2 border-gray-300 rounded-lg p-2 cursor-move hover:border-purple-400 transition-all';
+        frameDiv.draggable = true;
+        frameDiv.dataset.index = index;
+        frameDiv.title = '드래그하여 순서 변경';
+
+        const relativeDiv = document.createElement('div');
+        relativeDiv.className = 'relative';
+
+        const indexBadge = document.createElement('div');
+        indexBadge.className = 'absolute top-1 left-1 bg-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center';
+        indexBadge.textContent = index + 1;
+
+        const gripIcon = document.createElement('div');
+        gripIcon.className = 'absolute top-1 right-1 bg-gray-800 bg-opacity-50 text-white text-xs px-2 py-1 rounded';
+        gripIcon.innerHTML = '<i class="fas fa-grip-vertical"></i>';
+
+        relativeDiv.appendChild(indexBadge);
+        relativeDiv.appendChild(gripIcon);
+
+        const img = document.createElement('img');
+        img.src = frame.src; // Safe: validated by isValidDataUrl above
+        img.alt = `Frame ${index + 1}`;
+        img.className = 'w-full h-32 object-cover rounded mb-2';
+
+        const footerDiv = document.createElement('div');
+        footerDiv.className = 'flex justify-between items-center mt-2';
+
+        const dragHint = document.createElement('span');
+        dragHint.className = 'text-xs text-gray-500';
+        dragHint.innerHTML = '<i class="fas fa-arrows-alt mr-1"></i>드래그로 이동';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'text-red-600 hover:text-red-800 transition';
+        deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        deleteBtn.addEventListener('click', () => removeFrame(index));
+
+        footerDiv.appendChild(dragHint);
+        footerDiv.appendChild(deleteBtn);
+
+        frameDiv.appendChild(relativeDiv);
+        frameDiv.appendChild(img);
+        frameDiv.appendChild(footerDiv);
+
+        framesList.appendChild(frameDiv);
+    });
     
     // Add drag and drop functionality to frames
     const frameItems = document.querySelectorAll('.frame-item');
