@@ -245,12 +245,16 @@ function handleDragLeave(e) {
 function handleDrop(e) {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    
-    const files = Array.from(e.dataTransfer.files).filter(file => 
+
+    const files = Array.from(e.dataTransfer.files).filter(file =>
         file.type.startsWith('image/')
     );
-    
-    addFiles(files);
+
+    if (conversionMode === 'gif-to-video') {
+        handleGifToVideo(files[0]);
+    } else {
+        addFiles(files);
+    }
 }
 
 function addFiles(files) {
@@ -541,9 +545,10 @@ async function generateGIF() {
             progressSection.classList.add('hidden');
             generateBtn.disabled = false;
             
-            const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
-            const sizeKB = (blob.size / 1024).toFixed(2);
-            fileSize.textContent = `파일 크기: ${sizeMB > 1 ? sizeMB + ' MB' : sizeKB + ' KB'}`;
+            const sizeBytes = blob.size;
+            const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
+            const sizeKB = (sizeBytes / 1024).toFixed(2);
+            fileSize.textContent = `파일 크기: ${sizeBytes > 1024 * 1024 ? sizeMB + ' MB' : sizeKB + ' KB'}`;
             
             // Store blob for download
             resultGif.blob = blob;
@@ -659,10 +664,11 @@ async function convertToVideo() {
             conversionProgress.classList.add('hidden');
             convertToVideoBtn.disabled = false;
             
-            const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
-            const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
-            fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
-            
+            const videoSizeBytes = webmBlob.size;
+            const videoSizeMB = (videoSizeBytes / 1024 / 1024).toFixed(2);
+            const videoSizeKB = (videoSizeBytes / 1024).toFixed(2);
+            fileSize.textContent = `동영상 크기: ${videoSizeBytes > 1024 * 1024 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+
             URL.revokeObjectURL(gifUrl);
         };
         
@@ -783,13 +789,14 @@ async function handleGifToVideo(file) {
             downloadVideoBtn.classList.remove('hidden');
             downloadBtn.classList.add('hidden');
             
-            const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
-            const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
-            fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+            const videoSizeBytes = webmBlob.size;
+            const videoSizeMB = (videoSizeBytes / 1024 / 1024).toFixed(2);
+            const videoSizeKB = (videoSizeBytes / 1024).toFixed(2);
+            fileSize.textContent = `동영상 크기: ${videoSizeBytes > 1024 * 1024 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
         };
-        
+
         mediaRecorder.start();
-        
+
         updateProgress(70, '녹화 중...');
         
         // Draw GIF frames (animate for 3 seconds)
@@ -885,10 +892,11 @@ async function generateVideoDirectly() {
             
             generateBtn.disabled = false;
             
-            const videoSizeMB = (webmBlob.size / 1024 / 1024).toFixed(2);
-            const videoSizeKB = (webmBlob.size / 1024).toFixed(2);
-            fileSize.textContent = `동영상 크기: ${videoSizeMB > 1 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
-            
+            const videoSizeBytes = webmBlob.size;
+            const videoSizeMB = (videoSizeBytes / 1024 / 1024).toFixed(2);
+            const videoSizeKB = (videoSizeBytes / 1024).toFixed(2);
+            fileSize.textContent = `동영상 크기: ${videoSizeBytes > 1024 * 1024 ? videoSizeMB + ' MB' : videoSizeKB + ' KB'}`;
+
             resultSection.scrollIntoView({ behavior: 'smooth' });
         };
         
